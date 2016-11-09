@@ -1,0 +1,132 @@
+---
+title: "PML Qualitative Analysis of various exercises "
+author: "Sanjay Kumar Singh"
+date: "November 8, 2016"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+# Background
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement - a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. In this project we are using data of 6 volunteers who performed varied excercises with combinations of correct and incorrect excercises.
+
+# Objective
+
+Predict the manner in which the excercises were performed by the volunteers.
+
+Highlights:
+
+  * How the model was built.
+  * How the cross validation was carried out.
+  * Analysis on Sample Error.
+  * Reasoning behind selected model and the process in which the analysis was carried out.
+  * Predict atleast 20 different use case.
+
+```{r}
+library(caret)
+library(rpart)
+library(knitr)
+library(randomForest)
+library(ElemStatLearn)
+library(corrplot)
+set.seed(7517)
+```
+
+# Data Processing
+
+## Loading,Reading of Data
+
+```{r}
+
+## set working directory
+setwd("D:/Git/Coursera/PML_QualitativeAnalysis_DataScience")
+######################### DATA LOADING ################################################
+trainDataUrl <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv"
+testDataUrl <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv"
+
+trainFile <- "./data/pml-training.csv"
+testFile  <- "./data/pml-testing.csv"
+
+if (!file.exists("./data")) {
+  dir.create("./data")
+}
+if (!file.exists(trainFile)) {
+  download.file(trainDataUrl, destfile=trainFile)
+}
+if (!file.exists(testFile)) {
+  download.file(testDataUrl, destfile=testFile)
+}
+
+######################### DATA READING ################################################
+
+trainRaw <- read.csv("./data/pml-training.csv",header=T,sep=",",na.strings=c("NA",""))
+testRaw <- read.csv("./data/pml-testing.csv",header=T,sep=",",na.strings=c("NA",""))
+dim(trainRaw)
+dim(testRaw)
+```
+The training data set contains 19622 observations and 160 variables, while the testing data set contains 20 observations and 160 variables.
+
+```{r}
+trainRaw <- trainRaw[,-1] # Remove the first column that represents a ID Row
+inTrain = createDataPartition(trainRaw$classe, p=0.60, list=F)
+training = trainRaw[inTrain,]
+validating = trainRaw[-inTrain,]
+## all the columns that having less than 60% of data filled are removed.
+## Number of columns with less than 60% of data
+sum((colSums(!is.na(training[,-ncol(training)])) < 0.6*nrow(training))) 
+
+Keep <- c((colSums(!is.na(training[,-ncol(training)])) >= 0.6*nrow(training)))
+training   <-  training[,Keep]
+validating <- validating[,Keep]
+
+```
+
+
+# Modeling
+
+Classification Algorithm used in random forest. We are avoiding cross validation or a seperate test set to avoid test set error. Training model is proceeded using Random Forest.
+
+```{r}
+
+model <- randomForest(classe~.,data=training)
+model
+```
+
+# Model Verification
+
+```{r}
+importance(model)
+```
+
+# Model Result Evaluation
+
+```{r}
+confusionMatrix(predict(model,newdata=validating[,-ncol(validating)]),validating$classe)
+#The accurancy for the validating data set is calculated with the following formula
+accuracy<-c(as.numeric(predict(model,newdata=validating[,-ncol(validating)])==validating$classe))
+accuracy<-sum(accuracy)*100/nrow(validating)
+```
+
+# Cleaning & Transformation of Data
+```{r}
+testRaw <- testRaw[,-1] # Remove the first column that represents a ID Row
+testRaw <- testRaw[ , Keep] # Keep the same columns of testing dataset
+testRaw <- testRaw[,-ncol(testRaw)] # Remove the problem ID
+
+testing <- rbind(training[100, -59] , testRaw)
+row.names(testing) <- c(100, 1:20)
+
+```
+
+# Prediction with test data
+```{r}
+predictions <- predict(model,newdata=testing[-1,])
+predictions
+```
+
+# Summary
+
+Random Forest model is used for the prediction, the trained algorithm is able to correctly identify the all possible 20 test cases. The result of all the test cases are 100% accurate.
